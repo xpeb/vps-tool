@@ -22,6 +22,7 @@ read_menu_choice() {
             REPLY="$value"
             return 0
         fi
+        printf '\033[1A\r\033[2K'
         transient_error "无效输入，请重试。"
     done
 }
@@ -1116,6 +1117,7 @@ change_f2b_param() {
         if [ "$type" == "time" ] && validate_time "$new_val"; then break; fi
         if [ "$type" == "int" ] && validate_int "$new_val"; then break; fi
         if [ "$type" == "factor" ] && validate_int "$new_val"; then break; fi
+        printf '\033[1A\r\033[2K'
         transient_error "格式错误，请重试。"
     done
     if ! backup_f2b_config; then
@@ -1789,6 +1791,7 @@ manage_keys_menu() {
                { [[ "$key_action" =~ ^[0-9]+$ ]] && [ "$key_action" -ge 1 ] && [ "$key_action" -le "${#key_contents[@]}" ]; }; then
                 break
             fi
+            printf '\033[1A\r\033[2K'
             transient_error "输入无效，请重试。"
         done
 
