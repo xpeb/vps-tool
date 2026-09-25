@@ -37,24 +37,10 @@
 
 ## 安装
 
-仓库当前为 Private，执行克隆前请确保服务器已配置 GitHub SSH 密钥，或具备 HTTPS 仓库访问凭据。
-
-### SSH 克隆（推荐）
+仓库当前为 Private，服务器需要预先配置 GitHub SSH 访问权限。使用以下一条命令安装并启动：
 
 ```bash
-git clone git@github.com:xpeb/vps-tool.git /opt/vps-tool
-cd /opt/vps-tool
-chmod 700 vps.sh
-sudo ./vps.sh
-```
-
-### HTTPS 克隆
-
-```bash
-git clone https://github.com/xpeb/vps-tool.git /opt/vps-tool
-cd /opt/vps-tool
-chmod 700 vps.sh
-sudo ./vps.sh
+sudo git clone git@github.com:xpeb/vps-tool.git /opt/vps-tool && sudo chmod 700 /opt/vps-tool/vps.sh && sudo /opt/vps-tool/vps.sh
 ```
 
 ## 使用方式
@@ -108,6 +94,3 @@ vps-tool/
 
 该脚本会修改系统服务、SSH 配置、防火墙规则、日志和软件包。不同 VPS 镜像、发行版版本及云厂商环境可能存在差异。请先在测试机器上验证，并在生产环境执行前完成备份。
 
-## 许可证
-
-当前仓库暂未指定开源许可证。如需公开分发或二次开发，请根据实际需求补充许可证文件。
