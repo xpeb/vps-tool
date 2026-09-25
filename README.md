@@ -37,11 +37,13 @@
 
 ## 安装
 
-仓库当前为 Private，服务器需要预先配置 GitHub SSH 访问权限。使用以下一条命令安装并启动：
+仓库已公开，使用以下一条命令下载并启动脚本：
 
 ```bash
-sudo git clone git@github.com:xpeb/vps-tool.git /opt/vps-tool && sudo chmod 700 /opt/vps-tool/vps.sh && sudo /opt/vps-tool/vps.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/xpeb/vps-tool/main/vps.sh)
 ```
+
+请以 `root` 身份执行此命令。
 
 ## 使用方式
 
