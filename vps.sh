@@ -2147,46 +2147,6 @@ current_timezone() {
     printf '%s\n' "$tz"
 }
 
-has_legacy_cleanup() {
-    if [ -f /root/vpsclean.sh ] || [ -f /root/vps99clean.sh ]; then
-        return 0
-    fi
-    command -v crontab &>/dev/null || return 1
-    crontab -l 2>/dev/null | grep -Eq '(^|[[:space:]])([^[:space:]]*/)?vps(clean|99clean)\.sh([[:space:]]|$)|# vps\.sh-clean'
-}
-
-remove_legacy_cleanup() {
-    if command -v crontab &>/dev/null; then
-        local cron_lines
-        cron_lines=$(crontab -l 2>/dev/null || true)
-        if printf '%s\n' "$cron_lines" | grep -Eq '(^|[[:space:]])([^[:space:]]*/)?vps(clean|99clean)\.sh([[:space:]]|$)|# vps\.sh-clean'; then
-            if ! printf '%s\n' "$cron_lines" | grep -v -E '(^|[[:space:]])([^[:space:]]*/)?vps(clean|99clean)\.sh([[:space:]]|$)|# vps\.sh-clean' | crontab -; then
-                echo -e "${ERROR} 清理旧版 cron 项失败，旧脚本文件未删除。"
-                return 1
-            fi
-        fi
-    fi
-    rm -f /root/vpsclean.sh /root/vps99clean.sh
-    echo -e "${INFO} ${GREEN}旧版定时清理残留已清理。${RESET}"
-}
-
-manage_legacy_cleanup() {
-    if ! has_legacy_cleanup; then
-        echo -e "${INFO} 未检测到旧版定时清理残留。"
-        read -rp "按回车键返回..."
-        return
-    fi
-    echo -e "${YELLOW}${BOLD}检测到旧版定时清理任务或文件。${RESET}"
-    echo -e "删除范围：旧版 cron 项、/root/vpsclean.sh、/root/vps99clean.sh"
-    read -rp "确认清理这些旧版残留吗？(y/N): " confirm
-    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        remove_legacy_cleanup
-    else
-        echo -e "${INFO} 已取消。"
-    fi
-    read -rp "按回车键返回..."
-}
-
 show_vps_status() {
     local bbr_status fq_status tz docker_status zram_status
     bbr_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || true)
@@ -2223,11 +2183,6 @@ show_vps_status() {
     echo -e "zRAM     : ${zram_status}"
     echo -e "Docker   : ${docker_status}"
     echo -e "系统时区 : ${tz}"
-    if has_legacy_cleanup; then
-        echo -e "旧版定时清理 : ${YELLOW}检测到残留${RESET}"
-    else
-        echo -e "旧版定时清理 : ${GREEN}无残留${RESET}"
-    fi
 }
 
 manage_bbr() {
@@ -2455,10 +2410,9 @@ manage_system_optimization() {
         echo -e "  ${GREEN}3.${RESET} Docker 管理"
         echo -e "  ${GREEN}4.${RESET} 时区管理"
         echo -e "  ${GREEN}5.${RESET} 立即执行系统清理"
-        echo -e "  ${GREEN}6.${RESET} 清理旧版定时任务残留"
         echo -e "  ${GREEN}0.${RESET} 返回主菜单"
         echo -e "${CYAN}============================================================${RESET}"
-        read -rp "请选择 [0-6]: " choice
+        read -rp "请选择 [0-5]: " choice
         case "$choice" in
             1) manage_bbr ;;
             2) manage_zram ;;
@@ -2474,7 +2428,6 @@ manage_system_optimization() {
                 fi
                 read -rp "按回车键返回..."
                 ;;
-            6) manage_legacy_cleanup ;;
             0) return ;;
             *) echo -e "${ERROR} 无效选项！"; sleep 1 ;;
         esac

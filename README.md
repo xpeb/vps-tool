@@ -32,7 +32,6 @@
 - 配置 zRAM
 - 设置 `Asia/Shanghai` 时区
 - 清理包管理器缓存和过期日志
-- 清理旧版 VPS 定时清理任务残留
 - 管理 Docker 和 Compose
 - 查看系统、网络算法、zRAM、Docker 和时区状态
 
