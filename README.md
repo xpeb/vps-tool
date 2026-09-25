@@ -35,10 +35,32 @@
 - 管理 Docker 和 Compose
 - 查看系统、网络算法、zRAM、Docker 和时区状态
 
+## 安装
+
+仓库当前为 Private，执行克隆前请确保服务器已配置 GitHub SSH 密钥，或具备 HTTPS 仓库访问凭据。
+
+### SSH 克隆（推荐）
+
+```bash
+git clone git@github.com:xpeb/vps-tool.git /opt/vps-tool
+cd /opt/vps-tool
+chmod 700 vps.sh
+sudo ./vps.sh
+```
+
+### HTTPS 克隆
+
+```bash
+git clone https://github.com/xpeb/vps-tool.git /opt/vps-tool
+cd /opt/vps-tool
+chmod 700 vps.sh
+sudo ./vps.sh
+```
+
 ## 使用方式
 
 ```bash
-chmod 700 vps.sh
+cd /opt/vps-tool
 sudo ./vps.sh
 ```
 
