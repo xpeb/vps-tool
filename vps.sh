@@ -22,8 +22,14 @@ read_menu_choice() {
             REPLY="$value"
             return 0
         fi
-        echo -e "${ERROR} 无效输入，请重新输入（不刷新菜单）。${RESET}"
+        transient_error "无效输入，请重试。"
     done
+}
+
+transient_error() {
+    printf '%b' "\r\033[2K${ERROR} $*${RESET}"
+    sleep 0.8
+    printf '\r\033[2K'
 }
 
 if [ "$EUID" -ne 0 ]; then
@@ -1110,7 +1116,7 @@ change_f2b_param() {
         if [ "$type" == "time" ] && validate_time "$new_val"; then break; fi
         if [ "$type" == "int" ] && validate_int "$new_val"; then break; fi
         if [ "$type" == "factor" ] && validate_int "$new_val"; then break; fi
-        echo -e "${ERROR} 格式错误，请重试。"
+        transient_error "格式错误，请重试。"
     done
     if ! backup_f2b_config; then
         echo -e "${ERROR} 无法备份 Fail2Ban 配置，操作已取消。"
@@ -1163,8 +1169,7 @@ unban_f2b_ip() {
     [ -z "$target_ip" ] && return
     is_q "$target_ip" && return
     if ! validate_ip_or_cidr "$target_ip"; then
-        echo -e "${ERROR} IP 或 CIDR 格式不正确。"
-        sleep 1
+        transient_error "IP 或 CIDR 格式不正确。"
         return 1
     fi
     $SUDO fail2ban-client set "$TARGET_JAIL" unbanip "$target_ip"
@@ -1219,8 +1224,7 @@ add_f2b_whitelist() {
     [ -z "$input_ip" ] && input_ip="$current_ip"
     [ -z "$input_ip" ] && echo -e "${ERROR} 无法获取 IP。" && return
     if ! validate_ip_or_cidr "$input_ip"; then
-        echo -e "${ERROR} IP 或 CIDR 格式不正确。"
-        sleep 1
+        transient_error "IP 或 CIDR 格式不正确。"
         return
     fi
     if printf '%s\n' "$current_list" | awk -v ip="$input_ip" '{for (i = 1; i <= NF; i++) if ($i == ip) found=1} END {exit !found}'; then
@@ -1325,9 +1329,9 @@ manage_fail2ban_menu() {
         echo -e "${BOLD}${PURPLE}               Fail2Ban 防护管理${RESET}"
         echo -e "${CYAN}================================================${RESET}"
         echo -e "  服务状态: $(get_fail2ban_status)"
-        echo -e "  ${GREEN}1.${RESET} 最大重试次数     [${YELLOW}${VAL_MAX:-默认}${RESET}]"
-        echo -e "  ${GREEN}2.${RESET} 初始封禁时长     [${YELLOW}${VAL_BAN:-默认}${RESET}]$(fmt_f2b_unit "$VAL_BAN" "time")"
-        echo -e "  ${GREEN}3.${RESET} 监测时间窗口     [${YELLOW}${VAL_FIND:-默认}${RESET}]$(fmt_f2b_unit "$VAL_FIND" "time")"
+        echo -e "  ${GREEN}1.${RESET} 最大重试次数 [${YELLOW}${VAL_MAX:-默认}${RESET}]"
+        echo -e "  ${GREEN}2.${RESET} 初始封禁时间 [${YELLOW}${VAL_BAN:-默认}${RESET}]$(fmt_f2b_unit "$VAL_BAN" "time")"
+        echo -e "  ${GREEN}3.${RESET} 检测窗口     [${YELLOW}${VAL_FIND:-默认}${RESET}]$(fmt_f2b_unit "$VAL_FIND" "time")"
         echo -e "  ${GREEN}4.${RESET} 手动解封 IP"
         echo -e "  ${GREEN}5.${RESET} 添加 IP 白名单"
         echo -e "  ${GREEN}6.${RESET} 查看封禁日志 (最近20条)"
@@ -1466,19 +1470,10 @@ generate_vps_keypair() {
     echo -e " VPS 上的私钥路径 : ${CYAN}${key_file}${RESET}"
     echo -e " VPS 上的公钥路径 : ${CYAN}${pub_file}${RESET}"
     echo -e " 授权目标文件     : 已将公钥写入 ${CYAN}${HOME}/.ssh/authorized_keys${RESET}"
-    echo -e "${YELLOW}${BOLD}私钥不会显示在终端中，避免被终端记录或旁观者获取。${RESET}"
-    echo -e "请使用受信任的 SFTP 客户端，从 ${CYAN}${HOME}/.ssh/PrivateKey.pem${RESET} 安全下载私钥。"
-    echo -e "${GREEN}${BOLD}[公钥文本 (PublicKey.pub)] - 用于上传至 GitHub：${RESET}"
+    echo -e "${YELLOW}${BOLD}密钥已生成，私钥不会显示在终端。${RESET}"
+    echo -e "请通过 SFTP 下载并保管：${CYAN}${key_file}${RESET}"
+    echo -e "${GREEN}${BOLD}公钥（可上传到 GitHub）：${RESET}"
     echo -e "${GREEN}${pub_content}${RESET}"
-
-    echo -e "${BOLD}${PURPLE}[💡 新手一劳永逸指南]${RESET}"
-    echo -e " ${BOLD}一、保存私钥到本地电脑：${RESET}"
-    echo -e "   使用 SSH 客户端的 ${CYAN}SFTP / 文件传输${RESET} 功能，将 ${CYAN}${key_file}${RESET} 安全下载到本地，并妥善保管。"
-    echo -e "   不要通过聊天、邮件或不受信任的终端记录传输私钥。"
-    echo -e "   ${GREEN}公钥内容如下，可上传至 GitHub：${RESET}"
-    echo -e "   1. 打开 ${CYAN}https://github.com/settings/keys${RESET} ，点击 \"New SSH key\"；"
-    echo -e "   2. 将 ${CYAN}PublicKey.pub${RESET} 里的公钥粘贴并保存。"
-    echo -e "   3. ${GREEN}其他 VPS 可选择【选项 1】输入 GitHub 用户名获取此公钥。${RESET}\n"
 
     read -rp "确认已保存/下载密钥，是否立即删除 VPS 上的暂存密钥文件？(Y/n，q=取消): " rm_confirm
     if [[ -z "$rm_confirm" || "$rm_confirm" =~ ^[Yy]$ ]]; then
@@ -1582,11 +1577,11 @@ install_key_menu() {
         echo -e "${CYAN}================================================${RESET}"
         echo -e "${BOLD}${PURPLE}                SSH 密钥登录管理${RESET}"
         echo -e "${CYAN}================================================${RESET}"
-        echo -e "${BOLD}请选择 SSH 密钥配置方式：${RESET}"
-        echo -e "  ${GREEN}1.${RESET} 从 GitHub 获取公钥 (${CYAN}适合：已将公钥上传至 GitHub 的用户${RESET})"
-        echo -e "  ${GREEN}2.${RESET} 在 VPS 上全新生成密钥 (${CYAN}适合：本地没有密钥的新手，生成后可传 GitHub${RESET})"
-        echo -e "  ${GREEN}3.${RESET} 从自定义 URL 获取公钥 (${CYAN}适合：有公钥直链的用户${RESET})"
-        echo -e "  ${GREEN}4.${RESET} 管理已存公钥${key_count_label}"
+        echo -e "${BOLD}选择密钥来源：${RESET}"
+        echo -e "  ${GREEN}1.${RESET} GitHub 公钥"
+        echo -e "  ${GREEN}2.${RESET} 本地生成 ED25519 密钥"
+        echo -e "  ${GREEN}3.${RESET} HTTPS URL 公钥"
+        echo -e "  ${GREEN}4.${RESET} 管理公钥${key_count_label}"
         echo -e "  ${GREEN}5.${RESET} 密钥登录开关 ${pubkey_label}"
         echo -e "${CYAN}================================================${RESET}"
         read_menu_choice "请输入选项 [1-5]（q=返回）：" '^([1-5]|[qQ])$' || return
@@ -1603,8 +1598,7 @@ install_key_menu() {
                 read -rp "请输入您的 GitHub 用户名（q=取消）：" gh_user
                 is_q "$gh_user" && continue
                 if [[ ! "$gh_user" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]; then
-                    echo -e "${ERROR} GitHub 用户名格式不正确。"
-                    sleep 1
+                    transient_error "GitHub 用户名格式不正确。"
                     continue
                 fi
                 if ! backup_authorized_keys; then
@@ -1668,8 +1662,7 @@ install_key_menu() {
                     continue
                 fi
                 if ! validate_https_url "$key_url"; then
-                    echo -e "${ERROR} URL 格式不正确：必须是 HTTPS 主机地址，可带端口和路径。"
-                    sleep 1
+                    transient_error "URL 格式不正确。"
                     continue
                 fi
                 local pub_key
@@ -1796,7 +1789,7 @@ manage_keys_menu() {
                { [[ "$key_action" =~ ^[0-9]+$ ]] && [ "$key_action" -ge 1 ] && [ "$key_action" -le "${#key_contents[@]}" ]; }; then
                 break
             fi
-            echo -e "${ERROR} 输入无效，请重新输入。"
+            transient_error "输入无效，请重试。"
         done
 
         if is_q "$key_action"; then
@@ -1985,8 +1978,7 @@ change_ssh_port() {
     is_q "$new_port" && { echo -e "${INFO} 已取消端口修改。"; sleep 1; return; }
 
     if [[ ! "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1024 ] || [ "$new_port" -gt 65535 ]; then
-        echo -e "${ERROR} 端口格式不正确，必须为 1024-65535。"
-        sleep 1
+        transient_error "端口格式不正确，范围为 1024-65535。"
         return
     fi
     if [ "$new_port" = "$current_port" ]; then
@@ -2408,11 +2400,11 @@ manage_system_optimization() {
         echo -e "${BOLD}${PURPLE}                  系统优化管理${RESET}"
         echo -e "${CYAN}================================================${RESET}"
         show_vps_status
-        echo -e "  ${GREEN}1.${RESET} BBR + FQ 管理"
-        echo -e "  ${GREEN}2.${RESET} zRAM 管理"
-        echo -e "  ${GREEN}3.${RESET} Docker 管理"
-        echo -e "  ${GREEN}4.${RESET} 时区管理"
-        echo -e "  ${GREEN}5.${RESET} 立即执行系统清理"
+        echo -e "  ${GREEN}1.${RESET} BBR + FQ"
+        echo -e "  ${GREEN}2.${RESET} zRAM"
+        echo -e "  ${GREEN}3.${RESET} Docker"
+        echo -e "  ${GREEN}4.${RESET} 时区"
+        echo -e "  ${GREEN}5.${RESET} 系统清理"
         echo -e "${CYAN}================================================${RESET}"
         read_menu_choice "请选择 [1-5]（q=返回）：" '^([1-5]|[qQ])$' || return
         choice="$REPLY"
@@ -2463,12 +2455,12 @@ while true; do
     echo -e "${BOLD}${PURPLE}                VPS 综合管理工具${RESET}"
     echo -e "${CYAN}================================================${RESET}"
     echo -e "系统环境：${GREEN}${OS_SHORT} ${OS_VER}${RESET}"
-    echo -e "  ${GREEN}1.${RESET} 系统优化管理"
-    echo -e "  ${GREEN}2.${RESET} SSH 密钥管理"
-    echo -e "  ${GREEN}3.${RESET} 密码登录开关"
-    echo -e "  ${GREEN}4.${RESET} Fail2Ban 防护管理"
-    echo -e "  ${GREEN}5.${RESET} SSH 端口管理"
-    echo -e "  ${GREEN}6.${RESET} 查看完整系统状态"
+    echo -e "  ${GREEN}1.${RESET} 系统优化"
+    echo -e "  ${GREEN}2.${RESET} SSH 密钥"
+    echo -e "  ${GREEN}3.${RESET} 密码登录"
+    echo -e "  ${GREEN}4.${RESET} Fail2Ban"
+    echo -e "  ${GREEN}5.${RESET} SSH 端口"
+    echo -e "  ${GREEN}6.${RESET} 系统状态"
     echo -e "${CYAN}================================================${RESET}"
     read_menu_choice "请选择 [1-6]（q=退出）：" '^([1-6]|[qQ])$' || exit 0
     choice="$REPLY"
