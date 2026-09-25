@@ -14,6 +14,18 @@ INFO="${GREEN}[INFO]${RESET}"; WARN="${YELLOW}[WARN]${RESET}"; ERROR="${RED}[ERR
 
 is_q() { [[ "${1:-}" =~ ^[Qq]$ ]]; }
 
+read_menu_choice() {
+    local prompt="$1" valid="$2" value
+    while true; do
+        read -rp "$prompt" value || return 1
+        if [[ "$value" =~ $valid ]]; then
+            REPLY="$value"
+            return 0
+        fi
+        echo -e "${ERROR} 无效输入，请重新输入（不刷新菜单）。${RESET}"
+    done
+}
+
 if [ "$EUID" -ne 0 ]; then
     echo -e "${ERROR} 请使用 root 用户运行此脚本。"
     exit 1
@@ -863,14 +875,14 @@ check_f2b_install() {
             echo -e "\n${ERROR} Fail2Ban 安装失败！${RESET}"
             check_eol_system
             echo -e "${YELLOW}请先解决软件源问题，然后重新运行本脚本。${RESET}"
-            read -rp "按回车键返回..."
+            sleep 1
             return 1
         fi
 
         if [ ! -d "/etc/fail2ban" ]; then
             echo -e "\n${ERROR} /etc/fail2ban 目录不存在，安装可能不完整。${RESET}"
             echo -e "${YELLOW}请检查 Fail2Ban 是否安装成功：dpkg -l | grep fail2ban${RESET}"
-            read -rp "按回车键返回..."
+            sleep 1
             return 1
         fi
 
@@ -919,7 +931,8 @@ check_f2b_install() {
         echo -e "${YELLOW}可能是之前的卸载操作没有清理干净。${RESET}\n"
         echo -e "  ${GREEN}1.${RESET} 尝试修复（重新安装 Fail2Ban 以重建配置目录）"
         echo -e "  ${GREEN}2.${RESET} 强制卸载 Fail2Ban 残留"
-        read -rp "请选择 [1-2]（q=返回）：" f2b_fix_opt
+        read_menu_choice "请选择 [1-2]（q=返回）：" '^(1|2|[qQ])$' || return 1
+        f2b_fix_opt="$REPLY"
         is_q "$f2b_fix_opt" && return 1
         case "$f2b_fix_opt" in
             1)
@@ -941,7 +954,7 @@ check_f2b_install() {
                     sleep 1
                 else
                     echo -e "${ERROR} 修复失败，请手动处理：dpkg -l | grep fail2ban${RESET}"
-                    read -rp "按回车键返回..."
+                    sleep 1
                     return 1
                 fi
                 ;;
@@ -961,7 +974,7 @@ check_f2b_install() {
                 $SUDO rm -rf /etc/fail2ban
                 $SUDO rm -f /usr/bin/fail2ban-client /usr/bin/fail2ban-server /usr/local/bin/fail2ban-* 2>/dev/null
                 echo -e "${INFO} ${GREEN}Fail2Ban 已强制卸载。${RESET}"
-                read -rp "按回车键返回..."
+                sleep 1
                 return 1
                 ;;
             *)
@@ -1063,7 +1076,7 @@ check_f2b_install() {
 uninstall_f2b() {
     echo -e "\n${RED}${BOLD}警告：即将卸载 Fail2Ban 及其配置！${RESET}"
     read -rp "确认卸载吗？(y/N，q=取消): " confirm
-    [[ ! "$confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消卸载。"; read -rp "按回车键继续..."; return 1; }
+    [[ ! "$confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消卸载。"; sleep 1; return 1; }
     svc_stop fail2ban; svc_disable fail2ban
     pkg_remove fail2ban
     # 清 bash 命令缓存：否则 command -v 仍返回已删除的旧路径，
@@ -1080,7 +1093,7 @@ uninstall_f2b() {
     hash -r 2>/dev/null
     read -rp "是否同时删除配置目录 /etc/fail2ban？(y/N，q=取消): " del_conf
     [[ "$del_conf" =~ ^[Yy]$ ]] && { $SUDO rm -rf /etc/fail2ban; echo -e "${INFO} 已删除 /etc/fail2ban"; }
-    echo -e "${INFO} ${GREEN}Fail2Ban 卸载完成。${RESET}"; read -rp "按回车键继续..."
+    echo -e "${INFO} ${GREEN}Fail2Ban 卸载完成。${RESET}"; sleep 1
     return 0
 }
 
@@ -1101,14 +1114,14 @@ change_f2b_param() {
     done
     if ! backup_f2b_config; then
         echo -e "${ERROR} 无法备份 Fail2Ban 配置，操作已取消。"
-        read -rp "按回车键继续..."
+        sleep 1
         return 1
     fi
     if ! set_f2b_conf "$key" "$new_val"; then
         echo -e "${ERROR} Fail2Ban 配置未修改。"
         restore_f2b_config
         commit_f2b_config
-        read -rp "按回车键继续..."
+        sleep 1
         return 1
     fi
     if ! restart_f2b; then
@@ -1116,7 +1129,7 @@ change_f2b_param() {
         restore_f2b_config
         restart_f2b >/dev/null 2>&1 || true
         commit_f2b_config
-        read -rp "按回车键继续..."
+        sleep 1
         return 1
     fi
     commit_f2b_config
@@ -1132,12 +1145,12 @@ toggle_f2b_service() {
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
             svc_enable fail2ban; svc_start fail2ban
             for i in {1..5}; do
-                if fail2ban-client ping >/dev/null 2>&1; then echo -e "${INFO} ${GREEN}服务已成功启动。${RESET}"; read -rp "按回车键继续..."; return; fi; sleep 1
+                if fail2ban-client ping >/dev/null 2>&1; then echo -e "${INFO} ${GREEN}服务已成功启动。${RESET}"; sleep 1; return; fi; sleep 1
             done
             echo -e "${ERROR} 启动失败或超时。"
         fi
     fi
-    read -rp "按回车键继续..."
+    sleep 1
 }
 
 unban_f2b_ip() {
@@ -1151,12 +1164,12 @@ unban_f2b_ip() {
     is_q "$target_ip" && return
     if ! validate_ip_or_cidr "$target_ip"; then
         echo -e "${ERROR} IP 或 CIDR 格式不正确。"
-        read -rp "按回车键继续..."
+        sleep 1
         return 1
     fi
     $SUDO fail2ban-client set "$TARGET_JAIL" unbanip "$target_ip"
     [ $? -eq 0 ] && echo -e "${INFO} ${GREEN}解封成功: $target_ip${RESET}" || echo -e "${ERROR} 操作失败。"
-    read -rp "按回车键继续..."
+    sleep 1
 }
 
 validate_ip_or_cidr() {
@@ -1207,7 +1220,7 @@ add_f2b_whitelist() {
     [ -z "$input_ip" ] && echo -e "${ERROR} 无法获取 IP。" && return
     if ! validate_ip_or_cidr "$input_ip"; then
         echo -e "${ERROR} IP 或 CIDR 格式不正确。"
-        read -rp "按回车键继续..."
+        sleep 1
         return
     fi
     if printf '%s\n' "$current_list" | awk -v ip="$input_ip" '{for (i = 1; i <= NF; i++) if ($i == ip) found=1} END {exit !found}'; then
@@ -1231,7 +1244,7 @@ add_f2b_whitelist() {
             commit_f2b_config
         fi
     fi
-    read -rp "按回车键继续..."
+    sleep 1
 }
 
 view_f2b_logs() {
@@ -1275,7 +1288,8 @@ menu_f2b_exponential() {
         echo -e "  ${GREEN}1.${RESET} 递增模式开关   [${S_INC}]"
         echo -e "  ${GREEN}2.${RESET} 增长系数       [${YELLOW}${fac:-未设置}${RESET}]$(fmt_f2b_unit "$fac" "factor")"
         echo -e "  ${GREEN}3.${RESET} 封禁上限       [${YELLOW}${max:-未设置}${RESET}]$(fmt_f2b_unit "$max" "time")"
-        read -rp "请选择 [1-3]（q=返回）：" sc
+        read_menu_choice "请选择 [1-3]（q=返回）：" '^(1|2|3|[qQ])$' || return
+        sc="$REPLY"
         is_q "$sc" && return
         case "$sc" in
             1)
@@ -1298,13 +1312,12 @@ menu_f2b_exponential() {
                 ;;
             2) change_f2b_param "增长系数 (倍数)" "bantime.factor" "factor" ;;
             3) change_f2b_param "封禁上限 (时间)" "bantime.maxtime" "time" ;;
-            *) echo -e "${ERROR} 无效选项！"; sleep 1 ;;
         esac
     done
 }
 
 manage_fail2ban_menu() {
-    if ! check_f2b_install; then read -rp "按回车键返回主菜单..."; return; fi
+    if ! check_f2b_install; then sleep 1; return; fi
     while true; do
         clear
         VAL_MAX=$(get_f2b_conf "maxretry"); VAL_BAN=$(get_f2b_conf "bantime"); VAL_FIND=$(get_f2b_conf "findtime")
@@ -1321,7 +1334,8 @@ manage_fail2ban_menu() {
         echo -e "  ${GREEN}7.${RESET} 指数递增封禁设置 ->"
         echo -e "  ${GREEN}8.${RESET} 启用 / 停止 服务"
         echo -e "  ${GREEN}9.${RESET} 卸载 Fail2Ban"
-        read -rp "请选择 [1-9]（q=返回）：" choice
+        read_menu_choice "请选择 [1-9]（q=返回）：" '^([1-9]|[qQ])$' || return
+        choice="$REPLY"
         is_q "$choice" && return
         case "$choice" in
             1) change_f2b_param "最大重试次数" "maxretry" "int" ;;
@@ -1339,7 +1353,6 @@ manage_fail2ban_menu() {
                    return
                fi
                ;;
-            *) echo -e "${ERROR} 无效选项！"; sleep 1 ;;
         esac
     done
 }
@@ -1395,13 +1408,13 @@ generate_vps_keypair() {
     if ! ssh-keygen -t ed25519 -C "" -f "$work_dir/PrivateKey.pem" -N "" -q; then
         rm -rf "$work_dir"
         echo -e "${ERROR} 密钥生成失败，旧密钥未被修改。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     if [ ! -f "$work_dir/PrivateKey.pem.pub" ]; then
         rm -rf "$work_dir"
         echo -e "${ERROR} 密钥生成失败，旧密钥未被修改。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
 
@@ -1510,10 +1523,10 @@ toggle_pubkey_login() {
         if [[ "${pwd_auth,,}" == "no" ]]; then
             echo -e "${RED} 检测到密码登录已禁用，禁用密钥登录后你将无法登录此 VPS！${RESET}"
             read -rp "确认仍然要禁用密钥登录吗？(y/N，q=取消): " confirm_risky
-            [[ ! "$confirm_risky" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; read -rp "按回车键继续..."; return; }
+            [[ ! "$confirm_risky" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; sleep 1; return; }
         else
             read -rp "确认禁用密钥登录吗？(y/N，q=取消): " confirm
-            [[ ! "$confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; read -rp "按回车键继续..."; return; }
+            [[ ! "$confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; sleep 1; return; }
         fi
 
         if ! backup_ssh_config; then
@@ -1526,7 +1539,7 @@ toggle_pubkey_login() {
             echo -e "${INFO} ${GREEN}密钥登录已禁用，现在只能通过密码登录。${RESET}"
         fi
     fi
-    read -rp "按回车键继续..."
+    sleep 1
 }
 
 validate_https_url() {
@@ -1576,7 +1589,8 @@ install_key_menu() {
         echo -e "  ${GREEN}4.${RESET} 管理已存公钥${key_count_label}"
         echo -e "  ${GREEN}5.${RESET} 密钥登录开关 ${pubkey_label}"
         echo -e "${CYAN}================================================${RESET}"
-        read -rp "请输入选项 [1-5]（q=返回）：" key_opt
+        read_menu_choice "请输入选项 [1-5]（q=返回）：" '^([1-5]|[qQ])$' || return
+        key_opt="$REPLY"
         is_q "$key_opt" && return
 
         local test_hint=""
@@ -1590,12 +1604,12 @@ install_key_menu() {
                 is_q "$gh_user" && continue
                 if [[ ! "$gh_user" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]; then
                     echo -e "${ERROR} GitHub 用户名格式不正确。"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 if ! backup_authorized_keys; then
                     echo -e "${ERROR} 无法备份 authorized_keys，操作已取消。"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 echo -e "${INFO} 正在从 GitHub 拉取公钥..."
@@ -1618,7 +1632,7 @@ install_key_menu() {
                     fi
                     else
                         restore_authorized_keys
-                        read -rp "按回车键继续..."
+                        sleep 1
                         continue
                     fi
                 else
@@ -1627,7 +1641,7 @@ install_key_menu() {
                         do_restart=1
                     else
                         restore_authorized_keys
-                        read -rp "按回车键继续..."
+                        sleep 1
                         continue
                     fi
                 fi
@@ -1635,7 +1649,7 @@ install_key_menu() {
             2)
                 if ! backup_authorized_keys; then
                     echo -e "${ERROR} 无法备份 authorized_keys，操作已取消。"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 if ! generate_vps_keypair; then
@@ -1650,12 +1664,12 @@ install_key_menu() {
                 is_q "$key_url" && continue
                 if [ -z "$key_url" ]; then
                     echo -e "${ERROR} URL 不能为空！"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 if ! validate_https_url "$key_url"; then
                     echo -e "${ERROR} URL 格式不正确：必须是 HTTPS 主机地址，可带端口和路径。"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 local pub_key
@@ -1665,12 +1679,12 @@ install_key_menu() {
                     "$key_url")
                 if [ -z "$pub_key" ]; then
                     echo -e "${ERROR} 从 URL 获取公钥失败！"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 if ! backup_authorized_keys; then
                     echo -e "${ERROR} 无法备份 authorized_keys，操作已取消。"
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 if append_key_with_meta "$pub_key" "自定义URL"; then
@@ -1678,7 +1692,7 @@ install_key_menu() {
                     do_restart=1
                 else
                     restore_authorized_keys
-                    read -rp "按回车键继续..."
+                    sleep 1
                     continue
                 fi
                 ;;
@@ -1688,11 +1702,6 @@ install_key_menu() {
                 ;;
             5)
                 toggle_pubkey_login
-                continue
-                ;;
-            *)
-                echo -e "${ERROR} 无效选项！"
-                sleep 1
                 continue
                 ;;
         esac
@@ -1711,7 +1720,7 @@ install_key_menu() {
                 echo -e "${YELLOW}${BOLD}[重点测试]${RESET} ${test_hint}"
                 echo -e "测试成功后，再返回主菜单【禁用密码登录】！"
             fi
-            read -rp "按回车键返回密钥管理子菜单..."
+            sleep 1
         fi
     done
 }
@@ -1747,7 +1756,7 @@ manage_keys_menu() {
         if [ ${#key_contents[@]} -eq 0 ]; then
             echo -e "\n${WARN} 当前 ${auth_file} 中没有找到任何有效公钥！"
             echo -e "${CYAN}================================================${RESET}"
-            read -rp "按回车键返回..."
+            sleep 1
             return
         fi
 
@@ -1781,7 +1790,14 @@ manage_keys_menu() {
         echo -e " 输入 ${RED}[all]${RESET}  : 清空全部公钥"
         echo -e " 输入 ${GREEN}[q]${RESET}    : 返回上级菜单"
         echo -e "${CYAN}================================================${RESET}"
-        read -rp "请输入操作指令：" key_action
+        while true; do
+            read -rp "请输入操作指令（序号/all/q）：" key_action
+            if is_q "$key_action" || [ "$key_action" = "all" ] || \
+               { [[ "$key_action" =~ ^[0-9]+$ ]] && [ "$key_action" -ge 1 ] && [ "$key_action" -le "${#key_contents[@]}" ]; }; then
+                break
+            fi
+            echo -e "${ERROR} 输入无效，请重新输入。"
+        done
 
         if is_q "$key_action"; then
             return
@@ -1829,10 +1845,6 @@ manage_keys_menu() {
                 sleep 1
                 continue
             fi
-        else
-            echo -e "${ERROR} 输入无效，请重新输入！"
-            sleep 1
-            continue
         fi
     done
 }
@@ -1876,7 +1888,7 @@ toggle_password_login() {
                 echo -e "${RED}${BOLD}[危险] authorized_keys 中没有任何公钥，禁用密码登录后你将无法登录此 VPS！${RESET}"
             fi
             read -rp "确认仍然要禁用吗？(y/N，q=取消): " risky_confirm
-            [[ ! "$risky_confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; read -rp "按回车键继续..."; return; }
+            [[ ! "$risky_confirm" =~ ^[Yy]$ ]] && { echo -e "${INFO} 已取消操作。"; sleep 1; return; }
         fi
         if [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_TTY:-}" ]; then
             echo -e "${CYAN}${BOLD}[提示] 检测到您正在使用 SSH 远程会话，修改后切勿关闭当前窗口，请先新建终端测试连接！${RESET}"
@@ -1897,7 +1909,7 @@ toggle_password_login() {
             fi
         fi
     fi
-    read -rp "按回车键返回主菜单..."
+    sleep 1
 }
 
 selinux_prepare_ssh_port() {
@@ -1970,27 +1982,27 @@ change_ssh_port() {
         echo -e "${YELLOW}${BOLD}[提示] 检测到您正在使用 SSH 远程会话，修改端口后请勿关闭当前窗口，请先新建终端验证！${RESET}"
     fi
     read -rp "请输入新的 SSH 端口（1024-65535，q=取消）：" new_port
-    is_q "$new_port" && { echo -e "${INFO} 已取消端口修改。"; read -rp "按回车键返回主菜单..."; return; }
+    is_q "$new_port" && { echo -e "${INFO} 已取消端口修改。"; sleep 1; return; }
 
     if [[ ! "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1024 ] || [ "$new_port" -gt 65535 ]; then
         echo -e "${ERROR} 端口格式不正确，必须为 1024-65535。"
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return
     fi
     if [ "$new_port" = "$current_port" ]; then
         echo -e "${INFO} 新端口与当前端口相同，无需修改。"
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return
     fi
     if ! backup_ssh_config; then
         echo -e "${ERROR} 无法备份 SSH 配置，操作已取消。"
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return 1
     fi
 
     if ! selinux_prepare_ssh_port "$new_port"; then
         rollback_ssh_config
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return 1
     fi
 
@@ -2001,7 +2013,7 @@ change_ssh_port() {
         else
             echo -e "${ERROR} ufw 放行端口失败，已取消 SSH 端口切换。"
             rollback_ssh_port_change "$new_port" "$firewall_backend"
-            read -rp "按回车键返回主菜单..."
+            sleep 1
             return 1
         fi
     elif command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
@@ -2011,13 +2023,13 @@ change_ssh_port() {
             if ! firewall-cmd --reload >/dev/null; then
                 echo -e "${ERROR} firewalld 重载失败，已取消 SSH 端口切换。"
                 rollback_ssh_port_change "$new_port" "$firewall_backend"
-                read -rp "按回车键返回主菜单..."
+                sleep 1
                 return 1
             fi
         else
             echo -e "${ERROR} firewalld 放行端口失败，已取消 SSH 端口切换。"
             rollback_ssh_port_change "$new_port" "$firewall_backend"
-            read -rp "按回车键返回主菜单..."
+            sleep 1
             return 1
         fi
     fi
@@ -2025,14 +2037,14 @@ change_ssh_port() {
     if ! set_sshd_config "Port" "$new_port" || ! restart_sshd; then
         echo -e "${ERROR} SSH 端口修改失败，正在恢复原配置。"
         rollback_ssh_port_change "$new_port" "$firewall_backend"
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return 1
     fi
     sleep 1
     if ! ssh_port_listening "$new_port"; then
         echo -e "${ERROR} SSH 服务未监听新端口 ${new_port}，正在恢复原配置。"
         rollback_ssh_port_change "$new_port" "$firewall_backend"
-        read -rp "按回车键返回主菜单..."
+        sleep 1
         return 1
     fi
     selinux_commit_ssh_port
@@ -2066,7 +2078,7 @@ change_ssh_port() {
         ss -tulpn | grep ssh || true
     fi
     echo -e "${WARN} 注意：如使用的是云服务器，请务必在安全组中开放 TCP ${new_port} 端口。"
-    read -rp "按回车键返回主菜单..."
+    sleep 1
 }
 
 # ============ 系统优化模块 ============
@@ -2194,7 +2206,7 @@ manage_bbr() {
             echo -e "${WARN} 配置已写入，当前未完全生效，可能需要重启。"
         fi
     fi
-    read -rp "按回车键返回..."
+    sleep 1
 }
 
 manage_zram() {
@@ -2203,17 +2215,17 @@ manage_zram() {
         echo -e "${GREEN}检测到 zRAM swap 已启用。${RESET}"
     fi
     read -rp "是否部署或覆盖 zRAM？(y/N，q=取消): " confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || { read -rp "按回车键返回..."; return; }
+    [[ "$confirm" =~ ^[Yy]$ ]] || { sleep 1; return; }
 
     if ! command -v free &>/dev/null; then
         echo -e "${ERROR} 未找到 free，无法读取内存大小。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     total_mem=$(free -m | awk '/^Mem:/{print $2}')
     if ! [[ "$total_mem" =~ ^[0-9]+$ ]] || [ "$total_mem" -le 0 ]; then
         echo -e "${ERROR} 无法读取有效的内存大小。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     if [ "$total_mem" -le 1024 ]; then zram_size="$total_mem"; else zram_size=$((total_mem * 60 / 100)); fi
@@ -2224,7 +2236,7 @@ manage_zram() {
 
     if ! sysctl_set "vm.swappiness" "$swap_p" || ! sysctl -p >/dev/null 2>&1; then
         echo -e "${ERROR} swappiness 配置失败。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     if [ "$OS_ID" = "alpine" ]; then
@@ -2251,7 +2263,7 @@ manage_zram() {
         echo -e "${ERROR} zRAM 配置或启动失败，请检查内核模块和服务日志。"
         return 1
     fi
-    read -rp "按回车键返回..."
+    sleep 1
 }
 
 check_docker_latest() {
@@ -2299,7 +2311,8 @@ manage_docker() {
         echo -e "可用最新版本：Docker ${LATEST_DOCKER:-查询失败}，Compose ${LATEST_COMPOSE:-查询失败}"
         echo -e "  ${GREEN}1.${RESET} 更新 Docker/Compose"
         echo -e "  ${GREEN}2.${RESET} 卸载 Docker/Compose"
-        read -rp "请选择 [1-2]（q=返回）：" action
+        read_menu_choice "请选择 [1-2]（q=返回）：" '^(1|2|[qQ])$' || return
+        action="$REPLY"
         is_q "$action" && return
         case "$action" in 1) action=update ;; 2) action=remove ;; *) return ;; esac
     else
@@ -2361,31 +2374,31 @@ manage_timezone() {
     tz=$(current_timezone)
     echo -e "当前时区：${CYAN}${tz}${RESET}"
     read -rp "是否设置为 Asia/Shanghai？(y/N，q=取消): " confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || { read -rp "按回车键返回..."; return; }
+    [[ "$confirm" =~ ^[Yy]$ ]] || { sleep 1; return; }
     local zoneinfo="/usr/share/zoneinfo/Asia/Shanghai"
     if [ "$OS_ID" = "alpine" ] && [ ! -f "$zoneinfo" ]; then
-        apk add --no-cache tzdata >/dev/null 2>&1 || { echo -e "${ERROR} tzdata 安装失败。"; read -rp "按回车键返回..."; return 1; }
+        apk add --no-cache tzdata >/dev/null 2>&1 || { echo -e "${ERROR} tzdata 安装失败。"; sleep 1; return 1; }
     fi
     if [ ! -f "$zoneinfo" ] && [ "$PKG_MGR" = "apt" ]; then
         DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata >/dev/null 2>&1 || true
     fi
     if [ ! -f "$zoneinfo" ]; then
         echo -e "${ERROR} 未找到 Asia/Shanghai 时区数据。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     if ! ln -sf "$zoneinfo" /etc/localtime || ! printf 'Asia/Shanghai\n' > /etc/timezone; then
         echo -e "${ERROR} 时区写入失败。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     if [ "$(current_timezone)" != "Asia/Shanghai" ]; then
         echo -e "${ERROR} 时区设置后验证失败。"
-        read -rp "按回车键返回..."
+        sleep 1
         return 1
     fi
     echo -e "${INFO} ${GREEN}时区已设置为 Asia/Shanghai。${RESET}"
-    read -rp "按回车键返回..."
+    sleep 1
 }
 
 manage_system_optimization() {
@@ -2401,7 +2414,8 @@ manage_system_optimization() {
         echo -e "  ${GREEN}4.${RESET} 时区管理"
         echo -e "  ${GREEN}5.${RESET} 立即执行系统清理"
         echo -e "${CYAN}================================================${RESET}"
-        read -rp "请选择 [1-5]（q=返回）：" choice
+        read_menu_choice "请选择 [1-5]（q=返回）：" '^([1-5]|[qQ])$' || return
+        choice="$REPLY"
         is_q "$choice" && return
         case "$choice" in
             1) manage_bbr ;;
@@ -2416,9 +2430,8 @@ manage_system_optimization() {
                 else
                     echo -e "${INFO} 已取消系统清理。"
                 fi
-                read -rp "按回车键返回..."
+                sleep 1
                 ;;
-            *) echo -e "${ERROR} 无效选项！"; sleep 1 ;;
         esac
     done
 }
@@ -2455,9 +2468,10 @@ while true; do
     echo -e "  ${GREEN}3.${RESET} 密码登录开关"
     echo -e "  ${GREEN}4.${RESET} Fail2Ban 防护管理"
     echo -e "  ${GREEN}5.${RESET} SSH 端口管理"
-        echo -e "  ${GREEN}6.${RESET} 查看完整系统状态"
-        echo -e "${CYAN}================================================${RESET}"
-        read -rp "请选择 [1-6]（q=退出）：" choice
+    echo -e "  ${GREEN}6.${RESET} 查看完整系统状态"
+    echo -e "${CYAN}================================================${RESET}"
+    read_menu_choice "请选择 [1-6]（q=退出）：" '^([1-6]|[qQ])$' || exit 0
+    choice="$REPLY"
         is_q "$choice" && { echo -e "\n感谢使用！"; exit 0; }
     case "$choice" in
         1) manage_system_optimization ;;
@@ -2466,6 +2480,5 @@ while true; do
         4) manage_fail2ban_menu ;;
         5) change_ssh_port ;;
         6) clear; show_combined_status; read -rp "按回车键返回主菜单..." ;;
-        *) echo -e "${ERROR} 无效选项，请重新选择！"; sleep 1 ;;
     esac
 done
