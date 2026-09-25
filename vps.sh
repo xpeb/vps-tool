@@ -1120,7 +1120,7 @@ change_f2b_param() {
 }
 
 toggle_f2b_service() {
-    echo -e "\n${CYAN}------------------- 服务开关 -------------------${RESET}"
+    echo -e "\n${CYAN}------------ 服务开关 ------------${RESET}"
     if fail2ban-client ping >/dev/null 2>&1; then
         read -rp "是否停止并禁用 Fail2Ban? (y/N): " confirm
         [[ "$confirm" =~ ^[Yy]$ ]] && { svc_stop fail2ban; svc_disable fail2ban; echo -e "${WARN} 服务已停止。${RESET}"; }
@@ -1138,7 +1138,7 @@ toggle_f2b_service() {
 }
 
 unban_f2b_ip() {
-    echo -e "\n${CYAN}------------------ 手动解封 IP ------------------${RESET}"
+    echo -e "\n${CYAN}------------ 手动解封 IP ------------${RESET}"
     local banned_list
     banned_list=$(fail2ban-client status "$TARGET_JAIL" 2>/dev/null | grep "Banned IP list" | awk -F':' '{print $2}' | sed 's/^[ \t]*//')
     [ -z "$banned_list" ] && banned_list="无"
@@ -1192,7 +1192,7 @@ validate_ip_or_cidr() {
 }
 
 add_f2b_whitelist() {
-    echo -e "\n${CYAN}------------------ 白名单管理 ------------------${RESET}"
+    echo -e "\n${CYAN}------------ 白名单管理 ------------${RESET}"
     local current_list; current_list=$(get_f2b_conf "ignoreip")
     echo -e "当前白名单: ${YELLOW}${current_list:-继承全局或无}${RESET}"
     local current_ip; current_ip=$(echo "${SSH_CLIENT:-}" | awk '{print $1}')
@@ -1230,9 +1230,9 @@ add_f2b_whitelist() {
 
 view_f2b_logs() {
     clear
-    echo -e "${CYAN}============================================================${RESET}"
-    echo -e "${BOLD}${PURPLE}                 Fail2Ban 审计日志 (最近 20 条)${RESET}"
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
+    echo -e "${BOLD}${PURPLE}          Fail2Ban 审计日志 (最近 20 条)${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
     local out=""
     if [ "$INIT_SYS" = "systemd" ] && command -v journalctl &>/dev/null; then
         out=$(journalctl -u fail2ban --no-pager -n 200 2>/dev/null | grep -E '(Ban|Unban)' | tail -n 20)
@@ -1250,7 +1250,7 @@ view_f2b_logs() {
             print
         }'
     fi
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
     read -rp "按回车键返回..."
 }
 
@@ -1262,17 +1262,17 @@ menu_f2b_exponential() {
         fac=$(get_f2b_conf "bantime.factor")
         max=$(get_f2b_conf "bantime.maxtime")
         local S_INC; [ "$inc" == "true" ] && S_INC="${GREEN}启用${RESET}" || S_INC="${YELLOW}禁用${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
-        echo -e "${BOLD}${PURPLE}            高级: 指数封禁设置 (针对 sshd)${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
+        echo -e "${BOLD}${PURPLE}        高级: 指数封禁设置 (针对 sshd)${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         echo -e " 说明: 对重复犯错的恶意 IP，封禁时间按设定系数成倍递增"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}1.${RESET} 递增模式开关   [${S_INC}]"
         echo -e "  ${GREEN}2.${RESET} 增长系数       [${YELLOW}${fac:-未设置}${RESET}]$(fmt_f2b_unit "$fac" "factor")"
         echo -e "  ${GREEN}3.${RESET} 封禁上限       [${YELLOW}${max:-未设置}${RESET}]$(fmt_f2b_unit "$max" "time")"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}0.${RESET} 返回上级"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         echo -e "${GRAY}提示: 输入对应序号后可自定义该参数${RESET}"
         read -rp "请选择 [0-3]: " sc
         case "$sc" in
@@ -1307,24 +1307,24 @@ manage_fail2ban_menu() {
     while true; do
         clear
         VAL_MAX=$(get_f2b_conf "maxretry"); VAL_BAN=$(get_f2b_conf "bantime"); VAL_FIND=$(get_f2b_conf "findtime")
-        echo -e "${CYAN}============================================================${RESET}"
-        echo -e "${BOLD}${PURPLE}                     Fail2Ban 防护管理${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
+        echo -e "${BOLD}${PURPLE}               Fail2Ban 防护管理${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         echo -e "  服务状态: $(get_fail2ban_status)"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}1.${RESET} 最大重试次数     [${YELLOW}${VAL_MAX:-默认}${RESET}]"
         echo -e "  ${GREEN}2.${RESET} 初始封禁时长     [${YELLOW}${VAL_BAN:-默认}${RESET}]$(fmt_f2b_unit "$VAL_BAN" "time")"
         echo -e "  ${GREEN}3.${RESET} 监测时间窗口     [${YELLOW}${VAL_FIND:-默认}${RESET}]$(fmt_f2b_unit "$VAL_FIND" "time")"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}4.${RESET} 手动解封 IP"
         echo -e "  ${GREEN}5.${RESET} 添加 IP 白名单"
         echo -e "  ${GREEN}6.${RESET} 查看封禁日志 (最近20条)"
         echo -e "  ${GREEN}7.${RESET} 指数递增封禁设置 ->"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}8.${RESET} 启用 / 停止 服务"
         echo -e "  ${GREEN}9.${RESET} 卸载 Fail2Ban"
         echo -e "  ${GREEN}0.${RESET} 返回主菜单"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         read -rp "请选择 [0-9]: " choice
         case "$choice" in
             1) change_f2b_param "最大重试次数" "maxretry" "int" ;;
@@ -1356,9 +1356,9 @@ show_status() {
     local f2b_stat; f2b_stat=$(get_fail2ban_status)
     local key_count; key_count=$(count_authorized_keys)
 
-    echo -e "${CYAN}============================================================${RESET}"
-    echo -e "${BOLD}${PURPLE}                     SSH 安全配置工具${RESET}"
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
+    echo -e "${BOLD}${PURPLE}                SSH 安全配置工具${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
     echo -e " 系统架构 : ${GREEN}${OS_SHORT} ${OS_VER}${RESET}"
     if [[ "${pubkey_auth,,}" == "yes" ]]; then
         if [ "$key_count" -gt 0 ]; then
@@ -1376,7 +1376,7 @@ show_status() {
     fi
     echo -e " Fail2Ban : ${f2b_stat}"
     echo -e " SSH 端口 : ${CYAN}${port}${RESET}"
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
 }
 
 # ============ 密钥生成 ============
@@ -1457,13 +1457,13 @@ generate_vps_keypair() {
     echo -e " VPS 上的私钥路径 : ${CYAN}${key_file}${RESET}"
     echo -e " VPS 上的公钥路径 : ${CYAN}${pub_file}${RESET}"
     echo -e " 授权目标文件     : 已将公钥写入 ${CYAN}${HOME}/.ssh/authorized_keys${RESET}"
-    echo -e "${CYAN}------------------------------------------------------------${RESET}"
+    echo -e "${CYAN}------------------------------------------------${RESET}"
     echo -e "${YELLOW}${BOLD}私钥不会显示在终端中，避免被终端记录或旁观者获取。${RESET}"
     echo -e "请使用受信任的 SFTP 客户端，从 ${CYAN}${HOME}/.ssh/PrivateKey.pem${RESET} 安全下载私钥。"
-    echo -e "${CYAN}------------------------------------------------------------${RESET}"
+    echo -e "${CYAN}------------------------------------------------${RESET}"
     echo -e "${GREEN}${BOLD}[公钥文本 (PublicKey.pub)] - 用于上传至 GitHub：${RESET}"
     echo -e "${GREEN}${pub_content}${RESET}"
-    echo -e "${CYAN}------------------------------------------------------------${RESET}"
+    echo -e "${CYAN}------------------------------------------------${RESET}"
 
     echo -e "${BOLD}${PURPLE}[💡 新手一劳永逸指南]${RESET}"
     echo -e " ${BOLD}一、保存私钥到本地电脑：${RESET}"
@@ -1573,9 +1573,9 @@ install_key_menu() {
             pubkey_label="[${YELLOW}已禁用${RESET}]"
         fi
 
-        echo -e "${CYAN}============================================================${RESET}"
-        echo -e "${BOLD}${PURPLE}                     SSH 密钥登录管理${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
+        echo -e "${BOLD}${PURPLE}                SSH 密钥登录管理${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         echo -e "${BOLD}请选择 SSH 密钥配置方式：${RESET}"
         echo -e "  ${GREEN}1.${RESET} 从 GitHub 获取公钥 (${CYAN}适合：已将公钥上传至 GitHub 的用户${RESET})"
         echo -e "  ${GREEN}2.${RESET} 在 VPS 上全新生成密钥 (${CYAN}适合：本地没有密钥的新手，生成后可传 GitHub${RESET})"
@@ -1583,7 +1583,7 @@ install_key_menu() {
         echo -e "  ${GREEN}4.${RESET} 管理已存公钥${key_count_label}"
         echo -e "  ${GREEN}5.${RESET} 密钥登录开关 ${pubkey_label}"
         echo -e "  ${GREEN}0.${RESET} 返回主菜单"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         read -rp "请输入选项 [0-5]: " key_opt
 
         local test_hint=""
@@ -1612,7 +1612,7 @@ install_key_menu() {
                     "https://github.com/${gh_user}.keys")
                 if [ -z "$pub_key" ] || [[ "$pub_key" == "Not Found" ]]; then
                     echo -e "\n${ERROR} 获取公钥失败！可能是用户名不正确，或该 GitHub 账号未配置公钥。"
-                    echo -e "${CYAN}------------------------------------------------------------${RESET}"
+                    echo -e "${CYAN}------------------------------------------------${RESET}"
                     read -rp "是否要在 VPS 上全新生成密钥 (选项 2)？(y/N): " switch_opt2
                     if [[ "$switch_opt2" =~ ^[Yy]$ ]]; then
                     if generate_vps_keypair; then
@@ -1715,10 +1715,10 @@ install_key_menu() {
             else
                 commit_ssh_config
                 commit_authorized_keys
-                echo -e "\n${CYAN}------------------------------------------------------------${RESET}"
+                echo -e "\n${CYAN}------------------------------------------------${RESET}"
                 echo -e "${YELLOW}${BOLD}[重点测试]${RESET} ${test_hint}"
                 echo -e "测试成功后，再返回主菜单【禁用密码登录】！"
-                echo -e "${CYAN}------------------------------------------------------------${RESET}"
+                echo -e "${CYAN}------------------------------------------------${RESET}"
             fi
             read -rp "按回车键返回密钥管理子菜单..."
         fi
@@ -1732,9 +1732,9 @@ manage_keys_menu() {
 
     while true; do
         clear
-        echo -e "${CYAN}============================================================${RESET}"
-        echo -e "${BOLD}${PURPLE}                     SSH 已存公钥管理${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
+        echo -e "${BOLD}${PURPLE}                SSH 已存公钥管理${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
 
         local key_lines=()
         local key_contents=()
@@ -1755,13 +1755,13 @@ manage_keys_menu() {
 
         if [ ${#key_contents[@]} -eq 0 ]; then
             echo -e "\n${WARN} 当前 ${auth_file} 中没有找到任何有效公钥！"
-            echo -e "${CYAN}============================================================${RESET}"
+            echo -e "${CYAN}================================================${RESET}"
             read -rp "按回车键返回..."
             return
         fi
 
         printf " %-4s | %-19s | %-8s | %-16s\n" "序号" "      添加时间" "公钥类型" "    备注来源"
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
 
         local idx=1
         for key in "${key_contents[@]}"; do
@@ -1786,11 +1786,11 @@ manage_keys_menu() {
             ((idx++))
         done
 
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         echo -e " 输入 ${RED}[序号]${RESET} : 删除指定公钥"
         echo -e " 输入 ${RED}[all]${RESET}  : 清空全部公钥"
         echo -e " 输入 ${GREEN}[0]${RESET}    : 返回上级菜单"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         read -rp "请输入操作指令: " key_action
 
         if [ "$key_action" == "0" ]; then
@@ -2177,7 +2177,7 @@ show_vps_status() {
         docker_status="${YELLOW}未安装${RESET}"
     fi
 
-    echo -e "${CYAN}------------------- 系统优化状态 -------------------${RESET}"
+    echo -e "${CYAN}------------ 系统优化状态 ------------${RESET}"
     echo -e "系统环境 : ${GREEN}${OS_SHORT} ${OS_VER}${RESET}"
     echo -e "网络算法 : ${bbr_status}"
     echo -e "zRAM     : ${zram_status}"
@@ -2400,18 +2400,18 @@ manage_timezone() {
 manage_system_optimization() {
     while true; do
         clear
-        echo -e "${CYAN}============================================================${RESET}"
-        echo -e "${BOLD}${PURPLE}                     系统优化管理${RESET}"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
+        echo -e "${BOLD}${PURPLE}                  系统优化管理${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         show_vps_status
-        echo -e "${CYAN}------------------------------------------------------------${RESET}"
+        echo -e "${CYAN}------------------------------------------------${RESET}"
         echo -e "  ${GREEN}1.${RESET} BBR + FQ 管理"
         echo -e "  ${GREEN}2.${RESET} zRAM 管理"
         echo -e "  ${GREEN}3.${RESET} Docker 管理"
         echo -e "  ${GREEN}4.${RESET} 时区管理"
         echo -e "  ${GREEN}5.${RESET} 立即执行系统清理"
         echo -e "  ${GREEN}0.${RESET} 返回主菜单"
-        echo -e "${CYAN}============================================================${RESET}"
+        echo -e "${CYAN}================================================${RESET}"
         read -rp "请选择 [0-5]: " choice
         case "$choice" in
             1) manage_bbr ;;
@@ -2457,11 +2457,11 @@ esac
 check_dependencies || exit 1
 while true; do
     clear
-    echo -e "${CYAN}============================================================${RESET}"
-    echo -e "${BOLD}${PURPLE}                    VPS 综合管理工具${RESET}"
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
+    echo -e "${BOLD}${PURPLE}                VPS 综合管理工具${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
     echo -e "系统环境：${GREEN}${OS_SHORT} ${OS_VER}${RESET}"
-    echo -e "------------------------------------------------------------"
+    echo -e "------------------------------------------------"
     echo -e "  ${GREEN}1.${RESET} 系统优化管理"
     echo -e "  ${GREEN}2.${RESET} SSH 密钥管理"
     echo -e "  ${GREEN}3.${RESET} 密码登录开关"
@@ -2469,7 +2469,7 @@ while true; do
     echo -e "  ${GREEN}5.${RESET} SSH 端口管理"
     echo -e "  ${GREEN}6.${RESET} 查看完整系统状态"
     echo -e "  ${GREEN}0.${RESET} 退出"
-    echo -e "${CYAN}============================================================${RESET}"
+    echo -e "${CYAN}================================================${RESET}"
     read -rp "请选择 [0-6]: " choice
     case "$choice" in
         1) manage_system_optimization ;;

@@ -45,13 +45,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/xpeb/vps-tool/main/vps.sh)
 
 请以 `root` 身份执行此命令。
 
-## 使用方式
-
-```bash
-cd /opt/vps-tool
-sudo ./vps.sh
-```
-
 脚本必须以 `root` 身份运行。建议先通过云厂商控制台、VNC 或其他带外管理方式确认具备恢复 VPS 的能力，再修改 SSH 配置。
 
 ## 支持环境
