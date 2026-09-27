@@ -1,6 +1,6 @@
-# vps-tool
+# vps-tools
 
-面向 Debian 和 Alpine Linux VPS 的 Bash 管理工具，提供 SSH 安全、Fail2Ban 和常用系统优化功能。
+面向 Debian 和 Alpine Linux VPS 的 Bash 管理工具，包含 SSH/Fail2Ban 管理、系统调优和 sing-box 服务端面板。
 
 ## 功能
 
@@ -9,6 +9,8 @@
 - 自动检查 SSH 配置，失败时尝试回滚
 - Fail2Ban 安装、配置、封禁/解封和白名单管理
 - BBR + FQ、zRAM、时区和系统清理
+- 独立 BBR/内核参数调优脚本，支持预览和回滚
+- sing-box 服务端面板，支持多种代理协议
 - Docker、Compose 安装、更新和卸载
 - 包管理操作使用统一动态进度条
 
@@ -30,7 +32,7 @@ apk add --no-cache bash curl
 ## 使用
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/xpeb/vps-tool/main/vps.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/xpeb/vps-tools/main/vps.sh)
 ```
 
 修改 SSH 配置前，请保持当前会话，并确保具备云控制台、VNC 或其他带外恢复方式。
@@ -40,6 +42,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/xpeb/vps-tool/main/vps.sh)
 1. 添加公钥并使用新终端测试登录
 2. 修改 SSH 端口并确认安全组/防火墙规则
 3. 确认备用登录方式可用后，再禁用密码登录
+
+## 脚本
+
+- `vps.sh`：VPS 综合管理
+- `bbr.sh`：BBR、网络和内核参数调优；支持 `--dry-run` 和回滚
+- `singbox.sh`：sing-box 服务端面板
 
 ## Docker 说明
 
