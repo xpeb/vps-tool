@@ -1799,6 +1799,9 @@ LR
 
 install_singbox() {
   local tag ver arch url tmp bin name had stage oldbin="" had_bin=0
+  # 必须在写入 service unit 前读取状态；否则首次安装的服务会被
+  # install_service 创建出来，随后误判为原本已停止，导致安装后不启动。
+  had=$(svc_state)
   note "检查依赖…"
   ensure_deps || return 1
   ensure_service_user || return 1
@@ -1903,7 +1906,6 @@ install_singbox() {
     fi
     return 1
   }
-  had=$(svc_state)
   if ! install_service; then
     err "服务单元安装失败，正在恢复旧二进制…"
     _bin_rollback
