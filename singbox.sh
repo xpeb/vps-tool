@@ -661,22 +661,26 @@ cert_slug() {
 }
 
 curl_ip() {
-  local fam=$1 ip
+  local fam=$1 ip url family validator
+  local urls=()
   if [[ "$fam" == 6 ]]; then
-    ip=$(curl_secure -6 -fsS --connect-timeout 1 --max-time 2 https://api64.ipify.org 2>/dev/null \
-      || curl_secure -6 -fsS --connect-timeout 1 --max-time 2 https://ifconfig.me 2>/dev/null \
-      || curl_secure -6 -fsS --connect-timeout 1 --max-time 2 https://icanhazip.com 2>/dev/null \
-      || true)
+    family=-6
+    validator=is_ip6
+    urls=(https://api64.ipify.org https://ifconfig.me https://icanhazip.com)
   else
-    ip=$(curl_secure -4 -fsS --connect-timeout 1 --max-time 2 https://api.ip.sb/ip 2>/dev/null \
-      || curl_secure -4 -fsS --connect-timeout 1 --max-time 2 https://ifconfig.me 2>/dev/null \
-      || curl_secure -4 -fsS --connect-timeout 1 --max-time 2 https://icanhazip.com 2>/dev/null \
-      || true)
+    family=-4
+    validator=is_ip4
+    urls=(https://api.ip.sb/ip https://ifconfig.me https://icanhazip.com)
   fi
-  ip=$(printf '%s' "$ip" | tr -d ' \r\n')
-  if [[ "$fam" == 6 ]]; then is_ip6 "$ip" && printf '%s' "$ip"
-  else is_ip4 "$ip" && printf '%s' "$ip"
-  fi
+  for url in "${urls[@]}"; do
+    ip=$(curl_secure "$family" -fsS --connect-timeout 1 --max-time 2 "$url" 2>/dev/null || true)
+    ip=$(printf '%s' "$ip" | tr -d ' \r\n')
+    if "$validator" "$ip"; then
+      printf '%s' "$ip"
+      return 0
+    fi
+  done
+  return 1
 }
 
 iface_ip4() {
@@ -758,7 +762,7 @@ rand_str() {
 rand_port() {
   local p i used hex
   used=$(port_set)
-  for i in $(seq 1 64); do
+  for ((i=0; i<64; i++)); do
     hex=$(openssl rand -hex 2 2>/dev/null || true)
     [[ -n "$hex" ]] || hex=$(printf '%04x' $((RANDOM * RANDOM % 65536)))
     p=$((0x$hex))
@@ -1803,16 +1807,39 @@ LR
 }
 
 install_singbox() {
-  local tag ver arch url tmp bin name had stage oldbin="" had_bin=0
+  if [[ -x "$SINGBOX_BIN" ]]; then
+    err "sing-box 已安装，请使用 [更新内核] 菜单更新"
+    return 1
+  fi
+  install_singbox_core install
+}
+
+update_singbox() {
+  if [[ ! -x "$SINGBOX_BIN" ]]; then
+    err "sing-box 尚未安装，请先使用 [安装] 菜单"
+    return 1
+  fi
+  install_singbox_core update
+}
+
+install_singbox_core() {
+  local action=${1:-install} label=已安装
+  local tag ver arch url tmp bin name had stage oldbin="" current="" had_bin=0
   # 必须在写入 service unit 前读取状态；否则首次安装的服务会被
   # install_service 创建出来，随后误判为原本已停止，导致安装后不启动。
   had=$(svc_state)
   note "检查依赖…"
   ensure_deps || return 1
-  ensure_service_user || return 1
   note "获取稳定版号…"
   tag=$(stable_tag)
   ver="${tag#v}"
+  if [[ "$action" == update ]]; then
+    current=$(sb_version)
+    if [[ "${current#v}" == "$ver" ]]; then
+      ok "sing-box 已是最新版本 $current"
+      return 0
+    fi
+  fi
   arch=$(goarch) || return 1
   name="sing-box-${ver}-linux-${arch}.tar.gz"
   url="https://github.com/${GH_REPO}/releases/download/${tag}/${name}"
@@ -1937,7 +1964,9 @@ install_singbox() {
     fi
   fi
   rm -f "$oldbin"
-  ok "已安装 sing-box $($SINGBOX_BIN version | awk 'NR==1{print $3}')"
+  cache_bust
+  [[ "$action" == update ]] && label=已更新
+  ok "$label sing-box $($SINGBOX_BIN version | awk 'NR==1{print $3}')"
 }
 
 fetch_panel() {
@@ -2195,11 +2224,13 @@ svc_start() {
 }
 
 svc_stop() {
-  if [[ ! -x "$SINGBOX_BIN" && "$(svc_state)" == absent ]]; then
+  local state
+  state=$(svc_state)
+  if [[ ! -x "$SINGBOX_BIN" && "$state" == absent ]]; then
     err "未安装"
     return 1
   fi
-  [[ "$(svc_state)" == absent ]] && return 0
+  [[ "$state" == absent ]] && return 0
   svc_do stop
   if [[ "$(svc_state)" == running ]]; then
     err "停止失败"
@@ -2234,17 +2265,10 @@ svc_restart() {
 dashboard() {
   ui_reset
   ui_fill_info
-  ui_menu 1 安装
-  ui_menu 2 添加
-  ui_menu 3 编辑
-  ui_menu 4 分享
-  ui_menu 5 删除
-  ui_menu 6 启动
-  ui_menu 7 停止
-  ui_menu 8 重启
-  ui_menu 9 备份
-  ui_menu 10 恢复
-  ui_menu 11 卸载
+  local i menu=(安装 更新内核 添加 编辑 分享 删除 启动 停止 重启 备份 恢复 卸载)
+  for i in "${!menu[@]}"; do
+    ui_menu "$((i + 1))" "${menu[i]}"
+  done
 }
 
 pick_node_tag() {
@@ -2976,7 +3000,9 @@ restore_conf() {
     cp -a "$CONF_DIR"/. "$saved"/ 2>/dev/null \
       || { restore_fail "$tmp" "$saved" "无法创建原配置快照，未执行恢复"; return 1; }
   fi
-  [[ "$(svc_state)" != absent ]] && svc_stop || true
+  if [[ "$(svc_state)" != absent ]]; then
+    svc_stop || true
+  fi
   mkdir -p "$CONF_DIR" || { restore_fail "$tmp" "$saved" "无法创建配置目录"; return 1; }
   if ! clear_conf_contents || ! copy_conf_tree "$srcdir" "$CONF_DIR"; then
     if [[ -n "$saved" ]] && restore_saved_conf "$saved"; then
@@ -3271,7 +3297,9 @@ show_share() {
 }
 
 uninstall_all() {
-  if [[ ! -x "$SINGBOX_BIN" && "$(svc_state)" == absent && ! -d "$CONF_DIR" ]]; then
+  local state
+  state=$(svc_state)
+  if [[ ! -x "$SINGBOX_BIN" && "$state" == absent && ! -d "$CONF_DIR" ]]; then
     err "未安装"
     return 1
   fi
@@ -3279,9 +3307,11 @@ uninstall_all() {
   if ask_yn "卸载前先备份配置" y; then
     backup_conf || note "备份跳过/失败，继续卸载"
   fi
-  [[ "$(svc_state)" != absent ]] && svc_stop || true
+  state=$(svc_state)
+  if [[ "$state" != absent ]]; then
+    svc_stop || true
+  fi
   svc_do purge || true
-  rm -f "$SINGBOX_BIN" "$SINGBOX_SELF" /usr/local/bin/sbox
   # 注意：这里会连 .lock 一起删掉，持有进程的 flock 随之失去意义；
   # 此刻若有另一实例启动，它会新建 .lock 并成功加锁。避免并发运行面板即可。
   rm -rf "$CONF_DIR"
@@ -3422,16 +3452,17 @@ main_menu() {
     c=$(prompt "选择" "" "q退出") || { printf '\n'; exit 0; }
     case "$c" in
       1) install_singbox; back_main ;;
-      2) add_menu; menu_after $? view ;;
-      3) edit_node; menu_after $? view ;;
-      4) show_share; menu_after $? view ;;
-      5) del_node; menu_after $? ;;
-      6) svc_start; back_main ;;
-      7) svc_stop; back_main ;;
-      8) svc_restart; back_main ;;
-      9) backup_conf; menu_after $? ;;
-      10) restore_conf; menu_after $? ;;
-      11) uninstall_all; menu_after $? ;;
+      2) update_singbox; back_main ;;
+      3) add_menu; menu_after $? view ;;
+      4) edit_node; menu_after $? view ;;
+      5) show_share; menu_after $? view ;;
+      6) del_node; menu_after $? ;;
+      7) svc_start; back_main ;;
+      8) svc_stop; back_main ;;
+      9) svc_restart; back_main ;;
+      10) backup_conf; menu_after $? ;;
+      11) restore_conf; menu_after $? ;;
+      12) uninstall_all; menu_after $? ;;
       q|Q) printf '\n'; exit 0 ;;
     esac
   done
