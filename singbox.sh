@@ -1808,7 +1808,7 @@ LR
 
 install_singbox() {
   if [[ -x "$SINGBOX_BIN" ]]; then
-    err "sing-box 已安装，请使用 [更新内核] 菜单更新"
+    err "sing-box 已安装，请使用 [更新] 菜单更新"
     return 1
   fi
   install_singbox_core install
@@ -2273,7 +2273,7 @@ svc_restart() {
 dashboard() {
   ui_reset
   ui_fill_info
-  local i menu=(安装 更新内核 添加 编辑 分享 删除 启动 停止 重启 备份 恢复 卸载)
+  local i menu=(安装 更新 添加 编辑 分享 删除 启动 停止 重启 备份 恢复 卸载)
   for i in "${!menu[@]}"; do
     ui_menu "$((i + 1))" "${menu[i]}"
   done
