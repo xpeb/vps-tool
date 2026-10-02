@@ -1898,29 +1898,37 @@ install_singbox_core() {
       return 1
     fi
   fi
+  # 新二进制已校验，先删除下载包和解压目录，避免更新时额外占用空间。
+  rm -rf "$tmp"
+  tmp=""
   if [[ -x "$SINGBOX_BIN" ]]; then
+    # 只创建硬链接，不再复制或先移走旧文件。硬链接不占用内核文件的数据块，
+    # 且保留旧文件路径，后续 mv 新文件仍是原子替换，适合小磁盘 VPS。
     oldbin=$(mktemp "${SINGBOX_BIN}.old.XXXXXX") || {
       rm -f "$stage"
-      rm -rf "$tmp"
-      err "无法保存现有 sing-box 二进制"
+      err "无法创建旧版本备份路径，请检查磁盘空间或 inode"
       return 1
     }
-    if ! cp -p "$SINGBOX_BIN" "$oldbin"; then
+    if ! ln -f "$SINGBOX_BIN" "$oldbin"; then
       rm -f "$stage" "$oldbin"
-      rm -rf "$tmp"
-      err "保存现有 sing-box 二进制失败"
+      err "创建现有 sing-box 备份链接失败，请检查磁盘空间或文件权限"
       return 1
     fi
     had_bin=1
   fi
   if ! mv -f "$stage" "$SINGBOX_BIN"; then
-    rm -f "$stage" "$oldbin"
-    rm -rf "$tmp"
+    rm -f "$stage"
+    if [[ -n "$oldbin" && -f "$oldbin" ]]; then
+      if mv -f "$oldbin" "$SINGBOX_BIN"; then
+        oldbin=""
+      else
+        err "替换失败，旧版本备份保留在 $oldbin"
+      fi
+    fi
     err "替换 sing-box 二进制失败，旧版本未更改"
     return 1
   fi
   stage=""
-  rm -rf "$tmp"
   ensure_conf
   # 换新二进制后出问题时的统一回滚（装服务失败 / 启动失败共用）
   _bin_rollback() {
