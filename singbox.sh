@@ -32,7 +32,8 @@ EDIT_ACTIVE=""
 # 含密钥/证书的临时目录；退出时统一清理，避免中断残留
 TMP_CLEANUP=()
 # 管道安装时从该地址回源；export SINGBOX_URL 可覆盖（不走镜像前缀）
-SINGBOX_SRC_URL="https://raw.githubusercontent.com/1x2345/proxy/refs/heads/main/shell/singbox.sh"
+# 必须指向本仓库：否则管道执行时 BASH_SOURCE 为空，install_self 会回源到不存在的旧地址。
+SINGBOX_SRC_URL="https://raw.githubusercontent.com/xpeb/vps-tools/main/singbox.sh"
 # 空前缀为直连，其后为 GitHub 镜像
 GH_MIRROR_PREFIXES=("" "https://ghfast.top/" "https://ghproxy.net/")
 
@@ -1598,6 +1599,10 @@ build_tls_json() {
   local sni=$1 mode=$2 email=${3-} certdir alpn_json=${4-} tls
   if [[ "$mode" == acme ]]; then
     [[ -n "$email" ]] || email="admin@${sni}"
+    # systemd 的 ProtectSystem=strict 只会放行已存在的 ReadWritePaths；
+    # 先创建并收敛 ACME 数据目录，否则首次申请证书时服务用户无法写入。
+    mkdir -p "$CERT_DIR/acme" || { err "无法创建 ACME 数据目录"; return 1; }
+    harden_perms
     tls=$(jq -n --arg sni "$sni" --arg email "$email" --arg data "$CERT_DIR/acme" --arg provider "acme-${sni}" '{
       enabled: true,
       server_name: $sni,
@@ -1890,7 +1895,6 @@ install_singbox() {
   stage=""
   rm -rf "$tmp"
   ensure_conf
-  harden_perms
   # 换新二进制后出问题时的统一回滚（装服务失败 / 启动失败共用）
   _bin_rollback() {
     if (( had_bin )) && [[ -f "$oldbin" ]] && mv -f "$oldbin" "$SINGBOX_BIN"; then
@@ -2007,7 +2011,6 @@ install_self() {
 install_service() {
   ensure_service_user || return 1
   ensure_conf
-  harden_perms
   # Debian 走 journald，日志文件只对 OpenRC 有意义
   if [[ "$OS_KIND" != debian ]]; then
     touch "$LOG_FILE" 2>/dev/null || true
@@ -2163,10 +2166,8 @@ svc_files_current() {
   return 0
 }
 
-# svc_start / svc_restart 公共前置：确认内核、收敛权限、刷新过期的服务定义
+# svc_start / svc_restart 公共前置：刷新过期的服务定义
 svc_ready() {
-  need_bin || return 1
-  harden_perms
   if [[ "$(svc_state)" == absent ]]; then
     install_service || return 1
   elif ! svc_files_current; then
@@ -2182,7 +2183,6 @@ svc_ready() {
 
 svc_start() {
   need_bin || return 1
-  ensure_conf
   svc_ready || return 1
   svc_do start
   sleep 0.2
@@ -2413,7 +2413,7 @@ add_menu() {
 }
 
 add_ss() {
-  local port pass tag obj hs pass_st inner st ss
+  local port pass tag hs pass_st inner st ss
   port=$(ask_port) || return $?
   pass=$(ss2022_pass_new) || { err "SS2022 密码生成失败"; return 1; }
   ss2022_pass_ok "$pass" || { err "SS2022 密码生成失败"; return 1; }
@@ -2466,7 +2466,7 @@ add_vless() {
 }
 
 add_vmess() {
-  local port uuid tag obj sni tlsj insecure=0
+  local port uuid tag sni tlsj insecure=0
   port=$(ask_port) || return $?
   uuid=$("$SINGBOX_BIN" generate uuid)
   tag=$(tag_for vmess "$port")
